@@ -99,8 +99,8 @@ class Search:
         # search_string = update.message.text
         results = []
         if (query != '' or query != None):
-            result = self.sess.query(self.Voice).filter(or_(self.Voice.tags.ilike(query+u'%'),
-            self.Voice.voice_name.like(query+u'%'))).all()
+            result = self.sess.query(self.Voice).filter(or_(self.Voice.tags.ilike(u'%'+ query +u'%'),
+            self.Voice.voice_name.like(u'%' + query + u'%'))).all()
              
             for res in result:
                 results.append(InlineQueryResultCachedVoice(id=res.voice_id, voice_file_id=res.file_id, title=res.voice_name))
