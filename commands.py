@@ -99,7 +99,7 @@ class Search:
         # search_string = update.message.text
         results = []
         if (query != '' or query != None):
-            result = self.sess.query(self.Voice).filter(or_(self.Voice.tags.like(query+u'%'),
+            result = self.sess.query(self.Voice).filter(or_(self.Voice.tags.ilike(query+u'%'),
             self.Voice.voice_name.like(query+u'%'))).all()
              
             for res in result:
