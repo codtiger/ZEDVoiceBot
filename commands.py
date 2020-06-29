@@ -100,7 +100,7 @@ class Search:
         results = []
         if (query != '' or query != None):
             result = self.sess.query(self.Voice).filter(or_(self.Voice.tags.ilike(u'%'+ query +u'%'),
-            self.Voice.voice_name.like(u'%' + query + u'%'))).all()
+            self.Voice.voice_name.like(u'%' + query + u'%'))).limit(15).all()
              
             for res in result:
                 results.append(InlineQueryResultCachedVoice(id=res.voice_id, voice_file_id=res.file_id, title=res.voice_name))
@@ -130,7 +130,7 @@ def main():
     
     dsp = updater.dispatcher
 
-    start_handler = CommandHandler('start',start)
+    start_handler = CommandHandler('help',start)
     upload_handler = ConversationHandler(entry_points=[CommandHandler('upload',upload.upload_info)],
     states={
         UPLOAD_INFO : [MessageHandler(Filters.text,upload.upload_info)],
