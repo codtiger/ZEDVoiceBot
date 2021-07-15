@@ -1,5 +1,5 @@
 import re
-from media import Media
+from media import Media, FileSizeException
 import logging
 from telegram.ext import ConversationHandler
 from telegram import KeyboardButton, ReplyKeyboardMarkup , ReplyKeyboardRemove, Message
@@ -31,7 +31,7 @@ class Upload:
             button_list.append(KeyboardButton(i))
         button_list = self.__build_menu(button_list,3,2)
         return ReplyKeyboardMarkup(button_list)
-        
+
     def upload_info(self, update, context):
         if self.upload_state == 0:
             update.message.reply_text("Enter the owner of the voice(who recorded the goddman voice)",quote=True,
@@ -67,7 +67,12 @@ class Upload:
 
         elif update.message.video :
             self.media_type = 'Video'
-            self.media = Media(self.media_type, update.message)
+            try:
+                self.media = Media(self.media_type, update.message)
+            except FileSizeException as e:
+                update.message.reply_text(e +  "\nChoose another file")
+                return state_dict['UPLOAD_INFO']
+
             update.message.reply_text("Enter the interval you want to clip \
              \n (format <start> - <end> like: 10-20 or 1:20 - 2:00 \n \
              If you do not want to clip write gibberish or -1 ")
@@ -124,6 +129,11 @@ class Upload:
             start, end = None, None
         
         self.upload_media
+    
+    def abort_upload(self, update, context):
+        update.message.reply_text("Thanks for your contribution to the ZEDVoice Directory, comrade.")
+        self.upload_state = 0
+        return ConversationHandler.END
 
     def cancel(self,update,context):
         user = update.message.from_user

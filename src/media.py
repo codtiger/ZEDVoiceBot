@@ -12,11 +12,12 @@ logger = getLogger(__name__)
 
     
 def from_file_to_bytes(input_file: str, action :str="-f nut -vn -c:a libopus -ac 1", ss=None, to=None):
-    command = f"ffmpeg -i {input_file} {action} -"
+    command = f"ffmpeg -i {input_file} {action}"
 
     if ss != None and to != None:
         command += f" -ss {ss} -to {to}"
 
+    command += "  -"
     ffmpeg_cmd = subprocess.Popen(
         shlex.split(command),
         stdout=subprocess.PIPE,
@@ -33,6 +34,16 @@ def from_file_to_bytes(input_file: str, action :str="-f nut -vn -c:a libopus -ac
                 break
     return b
 
+class FileSizeException(Exception):
+
+    def __init__(self, file_size):
+        if file_size != 0:
+            self.message = "File size too huge {file_size} MBs."
+        else:
+            self.message = "Empty File"
+    def __str__(self):
+        return self.message
+
 class Media(object):
 
     def __init__(self, media_type: Optional[str], message:Message):
@@ -42,9 +53,11 @@ class Media(object):
     def _download_media(self, message: Message, tmp_save_path: str):
         Path(tmp_save_path).mkdir(parents=True, exist_ok=True)
         self.media_file : File = message.get_file()
-        if self.media_file.file_size > (100 * 1024 * 1024):
-            logger.warning(f"File size too huge! {self.media_file.file_size / (1024 * 1024)} MBs")
-        self.media_path = self.media_file.download(custom_path=tmp_save_path)
+        if self.media_file.file_size <= (100 * 1024 * 1024):
+            self.media_path = self.media_file.download(custom_path=tmp_save_path)
+        else:
+            # logger.error(f"File size too huge! {self.media_file.file_size / (1024 * 1024)} MBs")
+            raise FileSizeException(self.media_file.file_size)
         
     def get_bytes(self, message:Message, start=None, end=None):
         return from_file_to_bytes(self.media_path, ss=start, to=end)

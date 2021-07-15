@@ -9,9 +9,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
-from media import Media
-from upload import Upload, state_dict
-from search import Search
+from src.media import Media
+from src.upload import Upload, state_dict
+from src.search import Search
 
 logging.basicConfig(level=logging.INFO)
 
