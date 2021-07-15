@@ -105,5 +105,8 @@ venv.bak/
 
 .DS_Store
 
-# token file
+# vscode settings
+.vscode
+# token files
 token.txt
+test_token.txt
