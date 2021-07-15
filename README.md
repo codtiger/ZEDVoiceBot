@@ -22,9 +22,11 @@ python3 commands.py
 ### Features:
 - [x] Voice Store and Retrieval
 - [x] Query by tags and incomplete name (LIKE queries)
-- [ ] Other media type upload, conversion and interval selection support
-- [ ] Most sent voices and searchers for any user for personalized use cases.
+- [x] Other media type upload, conversion and interval selection support
+- [ ] Upload and Query voice statistics for any user, aiming for better voice recommendation.
+- [ ] Voice similarity search. Given time there would be good ideas to use packages such as [dejavu](https://github.com/worldveil/dejavu)
 
 #### Required Fixes:
 - [ ] Seperating upload state machine for each user whereas currently one object for all users.
-- [ ] Better edge case coverage for exception handling.
+- [ ] Better edge case coverage for exception handling.(Still needs some probing)
+- [ ] Voice file deletion shenanigans. Need to store voices in a separate reference chat message.
