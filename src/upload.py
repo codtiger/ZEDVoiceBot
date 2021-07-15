@@ -1,10 +1,13 @@
 import re
-from media import Media, FileSizeException
 import logging
+
 from telegram.ext import ConversationHandler
 from telegram import KeyboardButton, ReplyKeyboardMarkup , ReplyKeyboardRemove, Message
+from telegram.error import BadRequest
 
-logger=logging.Logger(name=__name__)
+from src.media import Media
+
+logger =logging.getLogger(name=__name__)
 
 state_dict = dict(UPLOAD_INFO=0, FILE_UPLOAD=1, CLIP_INTERVAL=2, DB_PROECSS=3)
 
@@ -34,8 +37,8 @@ class Upload:
 
     def upload_info(self, update, context):
         if self.upload_state == 0:
-            update.message.reply_text("Enter the owner of the voice(who recorded the goddman voice)",quote=True,
-            reply_markup=self.__reply_markup(),one_time_keyboard=True)
+            update.message.reply_text("Choose the owner of the voice(who recorded the goddman voice)",quote=True,
+            reply_markup=self.__reply_markup())
             self.upload_state = 1
             return state_dict['UPLOAD_INFO']
 
@@ -50,13 +53,13 @@ class Upload:
         elif self.upload_state == 2:
             self.voice_name = update.message.text
             logger.info("voice name is %s",self.voice_name)
-            update.message.reply_text("Enter the tags to ease the pain of searching",quote=True)
+            update.message.reply_text("Enter the tags for future voice query",quote=True)
             self.upload_state = 3
             return state_dict['UPLOAD_INFO']
             
         elif self.upload_state == 3:
             self.tags = update.message.text
-            update.message.reply_text("Now send me the voice",quote=True)
+            update.message.reply_text("Now send me the media",quote=True)
             logger.info("tags used for this voice are %s",self.tags)
             return state_dict['FILE_UPLOAD']
             
@@ -69,18 +72,25 @@ class Upload:
             self.media_type = 'Video'
             try:
                 self.media = Media(self.media_type, update.message)
-            except FileSizeException as e:
+            except BadRequest as e:
                 update.message.reply_text(e +  "\nChoose another file")
-                return state_dict['UPLOAD_INFO']
+                return state_dict['FILE_UPLOAD']
 
             update.message.reply_text("Enter the interval you want to clip \
              \n (format <start> - <end> like: 10-20 or 1:20 - 2:00 \n \
              If you do not want to clip write gibberish or -1 ")
+
             return state_dict['CLIP_INTERVAL']
 
         elif update.message.audio:
             self.media_type = 'Audio'
-            self.media = Media(self.media_type, update.message)
+            try:
+                self.media = Media(self.media_type, update.message)
+            except BadRequest as e:
+                logger.error(e)
+                update.message.reply_text("File too big, Telegram bot API is limited to 20 Mbs. Send me another file")
+                return state_dict['FILE_UPLOAD']
+
             update.message.reply_text("Enter the interval you want to clip \
              \n (format <start> - <end> like: 10-20 or 1:20 - 2:00 \n \
              If you do not want to clip write gibberish or -1 ")
@@ -94,14 +104,26 @@ class Upload:
     def upload_media(self, update, context, start=None, end=None):
         if self.media_type == 'Voice': 
             voice_message = update.message
+        # All other than voice
+        else:
+            if self.media_type == 'Audio':
+                ret_code, voice_path = self.media.get_voice(update.message, start=start, end=end)
+            # May change the functions depending on audio or video. For now same 
+            elif self.media_type == 'Video':
+                ret_code, voice_path = self.media.get_voice(update.message, start=start, end=end)
+            else:
+                logger.warn("Unsupported media type!")
+                return state_dict['FILE_UPLOAD']
 
-        elif self.media_type == 'Audio':
-            byte_array = self.media.get_bytes(update.message, start=start, end=end)
-            voice_message : Message = context.bot.send_voice(chat_id=update.message.chat_id, voice=byte_array)
-        # May change the functions depending on audio or video. For now same 
-        elif self.media_type == 'Video':
-            byte_array = self.media.get_bytes(update.message, start=start, end=end)
-            voice_message : Message = context.bot.send_voice(chat_id=update.message.chat_id, voice=byte_array)
+            if ret_code == 0:
+                with open(voice_path, 'rb') as voice_file:
+                    voice_message : Message = context.bot.send_voice(chat_id=update.message.chat_id, voice=voice_file)
+            else:
+                logger.error(f"media conversion return code {ret_code}")
+                update.message.reply_text("There is a problem with the sent video. Try changing encoding and send me the file.")
+                return state_dict['FILE_UPLOAD'] 
+            # No plans(yet) to save voice on the server.        
+            del self.media
 
         file_id = voice_message.voice.file_id
 
@@ -128,7 +150,7 @@ class Upload:
             logger.info("Wrong Interval Format")
             start, end = None, None
         
-        self.upload_media
+        self.upload_media(update, context, start=start, end=end)
     
     def abort_upload(self, update, context):
         update.message.reply_text("Thanks for your contribution to the ZEDVoice Directory, comrade.")
@@ -139,7 +161,7 @@ class Upload:
         user = update.message.from_user
         logger.info("user %s cancelled the upload operation",user.first_name)
         update.message.reply_text("Upload operation cancelled by user:(")
-        self.upload_state=0
+        self.upload_state = 0
         return ConversationHandler.END
 
     def get_members(self):

@@ -4,15 +4,26 @@ import os
 from pathlib import Path
 from telegram.message import Video, Audio, Message
 from telegram.files.file import File
+from telegram.error import BadRequest
 from typing import Optional
 
-from logging import getLogger
+import logging
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-    
+def from_file_to_ogg(input_file: str, action : str= "-vn -c:a libopus", ss=None, to=None):
+    command = f"ffmpeg -i \'{input_file}\' {action}"
+
+    if ss != None and to != None:
+        command += f" -ss {ss} -to {to}"
+
+    out_path = Path(input_file).stem + ".ogg"
+    command += f" \'{out_path}\'"
+    cmd_out = subprocess.run(command, shell=True).returncode
+    return cmd_out, out_path
+
 def from_file_to_bytes(input_file: str, action :str="-f nut -vn -c:a libopus -ac 1", ss=None, to=None):
-    command = f"ffmpeg -i {input_file} {action}"
+    command = f"ffmpeg -i \'{input_file}\' {action}"
 
     if ss != None and to != None:
         command += f" -ss {ss} -to {to}"
@@ -34,36 +45,42 @@ def from_file_to_bytes(input_file: str, action :str="-f nut -vn -c:a libopus -ac
                 break
     return b
 
-class FileSizeException(Exception):
-
-    def __init__(self, file_size):
-        if file_size != 0:
-            self.message = "File size too huge {file_size} MBs."
-        else:
-            self.message = "Empty File"
-    def __str__(self):
-        return self.message
-
 class Media(object):
 
     def __init__(self, media_type: Optional[str], message:Message):
-        super.__init__()
+        super().__init__()
+        self.media_type = media_type
+        self.ogg_voice = None
         self._download_media(message, 'tmp_media/')
+        
 
     def _download_media(self, message: Message, tmp_save_path: str):
         Path(tmp_save_path).mkdir(parents=True, exist_ok=True)
-        self.media_file : File = message.get_file()
-        if self.media_file.file_size <= (100 * 1024 * 1024):
-            self.media_path = self.media_file.download(custom_path=tmp_save_path)
-        else:
-            # logger.error(f"File size too huge! {self.media_file.file_size / (1024 * 1024)} MBs")
-            raise FileSizeException(self.media_file.file_size)
-        
-    def get_bytes(self, message:Message, start=None, end=None):
-        return from_file_to_bytes(self.media_path, ss=start, to=end)
+
+        if self.media_type == 'Video':
+            logger.info(f"Downloading Video {message.video.file_id}")
+            self.media_file : File = message.video.get_file()
+            self.media_name = message.video.file_name
+
+        elif self.media_type == 'Audio':
+            logger.info(f"Downloading Audio {message.audio.file_id}")
+            self.media_file : File = message.audio.get_file()
+            self.media_name = message.audio.file_name
+
+        self.media_path = self.media_file.download(custom_path=Path(tmp_save_path) / Path(self.media_name))
+        logger.info(self.media_path)
+
+    def get_voice(self, message:Message, start=None, end=None):
+        ret_code, self.ogg_voice = from_file_to_ogg(self.media_path, ss=start, to=end)
+        os.remove(self.media_path)
+        return ret_code, self.ogg_voice
 
     def _download_video(self, message:Video):
         pass
 
     def _download_audio(self, message:Audio):
         pass
+
+    def __del__(self):
+        if self.ogg_voice is not None:
+            os.remove(self.ogg_voice)

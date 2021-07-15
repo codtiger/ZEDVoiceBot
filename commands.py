@@ -47,12 +47,12 @@ def main():
     start_handler = CommandHandler('help',start)
     upload_handler = ConversationHandler(entry_points=[CommandHandler('upload',upload.upload_info)],
     states={
-        state_dict['UPLOAD_INFO'] : [MessageHandler(Filters.text,upload.upload_info)],
+        state_dict['UPLOAD_INFO'] : [MessageHandler(Filters.text, upload.upload_info)],
         state_dict['FILE_UPLOAD']: [MessageHandler(Filters.video | Filters.audio | Filters.voice, upload.parse_media_type)],
         state_dict['CLIP_INTERVAL'] : [MessageHandler(Filters.text, upload.get_clip_interval)]
     },
-    fallbacks=[CommandHandler('cancel',upload.cancel)]
-
+    fallbacks=[CommandHandler('cancel',upload.cancel)],
+    allow_reentry=True
     )
     search_handler = InlineQueryHandler(select.search)
     dsp.add_handler(start_handler)

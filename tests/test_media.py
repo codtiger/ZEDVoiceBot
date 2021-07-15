@@ -5,7 +5,7 @@ import wave
 import contextlib
 from datetime import datetime
 
-from src.media import from_file_to_bytes
+from src.media import from_file_to_bytes, from_file_to_ogg
 
 @pytest.fixture(autouse=True)
 def cleanup_directory():
@@ -37,7 +37,7 @@ def test_ffmpeg_can_create_sine_audio(create_sine_audio):
         duration = frames / float(rate * f.getnchannels())
     assert duration == 10.0
 
-def test_conversion_to_ogg(create_sine_audio):
+def test_conversion_to_bytes(create_sine_audio):
     """
     Tests if ffmpeg can create sine audio.
     """
@@ -45,6 +45,17 @@ def test_conversion_to_ogg(create_sine_audio):
     assert isinstance(byte_array, bytes)
     with open('test.ogg', 'wb') as f:
         f.write(byte_array)
-    out = subprocess.check_output("ffmpeg -i test.ogg 2>&1 | grep Duration | awk \'{print $2}\' | tr -d ,", shell=True)
-    assert datetime.strptime(out.decode('ascii').strip(), "%H:%M:%S.%f").time().second == 3
+    dur = subprocess.check_output("ffmpeg -i test.ogg 2>&1 | grep Duration | awk \'{print $2}\' | tr -d ,", shell=True)
+    assert datetime.strptime(dur.decode('ascii').strip(), "%H:%M:%S.%f").time().second == 3
     
+def test_conversion_to_voice(create_sine_audio):
+    """
+    Tests if ffmpeg can convert straight to ogg voice audio
+    """
+    cmd_out, file_path = from_file_to_ogg('test.wav', ss=7, to=10)
+    assert cmd_out == 0
+    assert file_path == 'test.ogg'
+    assert os.path.exists(file_path)
+
+    dur = subprocess.check_output("ffmpeg -i test.ogg 2>&1 | grep Duration | awk \'{print $2}\' | tr -d ,", shell=True)
+    assert datetime.strptime(dur.decode('ascii').strip(), "%H:%M:%S.%f").time().second == 3
