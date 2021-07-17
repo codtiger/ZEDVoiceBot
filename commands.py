@@ -10,7 +10,7 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
 from src.media import Media
-from src.upload import Upload, state_dict
+from src.upload import Upload, UploadState
 from src.search import Search
 
 logging.basicConfig(level=logging.INFO)
@@ -47,9 +47,9 @@ def main():
     start_handler = CommandHandler('help',start)
     upload_handler = ConversationHandler(entry_points=[CommandHandler('upload',upload.upload_info)],
     states={
-        state_dict['UPLOAD_INFO'] : [MessageHandler(Filters.text, upload.upload_info)],
-        state_dict['FILE_UPLOAD']: [MessageHandler(Filters.video | Filters.audio | Filters.voice, upload.parse_media_type)],
-        state_dict['CLIP_INTERVAL'] : [MessageHandler(Filters.text, upload.get_clip_interval)]
+        UploadState.UPLOAD_INFO : [MessageHandler(Filters.text, upload.upload_info)],
+        UploadState.FILE_UPLOAD: [MessageHandler(Filters.video | Filters.audio | Filters.voice, upload.parse_media_type)],
+        UploadState.CLIP_INTERVAL : [MessageHandler(Filters.text, upload.get_clip_interval)]
     },
     fallbacks=[CommandHandler('cancel',upload.cancel)],
     allow_reentry=True

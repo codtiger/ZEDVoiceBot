@@ -1,5 +1,6 @@
 import re
 import logging
+from enum import Enum
 
 from telegram.ext import ConversationHandler
 from telegram import KeyboardButton, ReplyKeyboardMarkup , ReplyKeyboardRemove, Message
@@ -9,18 +10,21 @@ from src.media import Media
 
 logger =logging.getLogger(name=__name__)
 
-state_dict = dict(UPLOAD_INFO=0, FILE_UPLOAD=1, CLIP_INTERVAL=2, DB_PROECSS=3)
+class UploadState(Enum):
+    UPLOAD_INFO = 0
+    FILE_UPLOAD = 1
+    CLIP_INTERVAL = 2
+    DB_PROECSS = 3
 
 class Upload:
 
     def __init__(self,session_db,tables):
         self.sess = session_db
-        self.upload_state = 0
+        self.inner_state = {}
         self.User,self.Voice = tables
         self.members_by_id = self.get_members()
 
     def __build_menu(self,buttons, n_rows, n_cols, header_buttons=None, footer_buttons=None):
-
         menu = [buttons[i:i + n_cols] for i in range(0, len(buttons), n_cols)]
         if header_buttons:
             menu.insert(0, [header_buttons])
@@ -36,32 +40,37 @@ class Upload:
         return ReplyKeyboardMarkup(button_list)
 
     def upload_info(self, update, context):
-        if self.upload_state == 0:
+        user_id = update.message.from_user.id
+
+        if self.inner_state.get(user_id) is None:
+            self.inner_state[user_id] = 0
+
+        if self.inner_state[user_id] == 0:
             update.message.reply_text("Choose the owner of the voice(who recorded the goddman voice)",quote=True,
             reply_markup=self.__reply_markup())
-            self.upload_state = 1
-            return state_dict['UPLOAD_INFO']
+            self.inner_state[user_id] = 1
+            return UploadState.UPLOAD_INFO
 
-        elif self.upload_state == 1:
+        elif self.inner_state[user_id] == 1:
             self.voice_owner = update.message.text
             self.owner_id = self.members_by_id[self.voice_owner]
             logger.info("voice_owner name is %s",self.voice_owner)
             update.message.reply_text("Enter the voice name you like to call",quote=True,reply_markup=ReplyKeyboardRemove())
-            self.upload_state = 2
-            return state_dict['UPLOAD_INFO']
+            self.inner_state[user_id] = 2
+            return UploadState.UPLOAD_INFO
 
-        elif self.upload_state == 2:
+        elif self.inner_state[user_id] == 2:
             self.voice_name = update.message.text
             logger.info("voice name is %s",self.voice_name)
             update.message.reply_text("Enter the tags for future voice query",quote=True)
-            self.upload_state = 3
-            return state_dict['UPLOAD_INFO']
+            self.inner_state[user_id] = 3
+            return UploadState.UPLOAD_INFO
             
-        elif self.upload_state == 3:
+        elif self.inner_state[user_id] == 3:
             self.tags = update.message.text
             update.message.reply_text("Now send me the media",quote=True)
             logger.info("tags used for this voice are %s",self.tags)
-            return state_dict['FILE_UPLOAD']
+            return UploadState.FILE_UPLOAD
             
     def parse_media_type(self, update, context):
         if update.message.voice:
@@ -74,13 +83,13 @@ class Upload:
                 self.media = Media(self.media_type, update.message)
             except BadRequest as e:
                 update.message.reply_text(e +  "\nChoose another file")
-                return state_dict['FILE_UPLOAD']
+                return UploadState.FILE_UPLOAD
 
             update.message.reply_text("Enter the interval you want to clip \
              \n (format <start> - <end> like: 10-20 or 1:20 - 2:00 \n \
              If you do not want to clip write gibberish or -1 ")
 
-            return state_dict['CLIP_INTERVAL']
+            return UploadState.FILE_UPLOAD
 
         elif update.message.audio:
             self.media_type = 'Audio'
@@ -89,17 +98,17 @@ class Upload:
             except BadRequest as e:
                 logger.error(e)
                 update.message.reply_text("File too big, Telegram bot API is limited to 20 Mbs. Send me another file")
-                return state_dict['FILE_UPLOAD']
+                return UploadState.FILE_UPLOAD
 
             update.message.reply_text("Enter the interval you want to clip \
              \n (format <start> - <end> like: 10-20 or 1:20 - 2:00 \n \
              If you do not want to clip write gibberish or -1 ")
 
-            return state_dict['CLIP_INTERVAL']
+            return UploadState.CLIP_INTERVAL
         else:
             logger.warn('Unsupported Media type at this stage')
             update.message.reply_text("Unsupported Media Type! Try again.")
-            return state_dict['FILE_UPLOAD']
+            return UploadState.FILE_UPLOAD
 
     def upload_media(self, update, context, start=None, end=None):
         if self.media_type == 'Voice': 
@@ -113,7 +122,7 @@ class Upload:
                 ret_code, voice_path = self.media.get_voice(update.message, start=start, end=end)
             else:
                 logger.warn("Unsupported media type!")
-                return state_dict['FILE_UPLOAD']
+                return UploadState.FILE_UPLOAD
 
             if ret_code == 0:
                 with open(voice_path, 'rb') as voice_file:
@@ -121,7 +130,7 @@ class Upload:
             else:
                 logger.error(f"media conversion return code {ret_code}")
                 update.message.reply_text("There is a problem with the sent video. Try changing encoding and send me the file.")
-                return state_dict['FILE_UPLOAD'] 
+                return UploadState.FILE_UPLOAD
             # No plans(yet) to save voice on the server.        
             del self.media
 
@@ -132,7 +141,7 @@ class Upload:
         # voice = update.message.voice.get_file()
         # voice.download(self.voice_name+'.ogg')
         update.message.reply_text("Thanks for your contribution to the ZEDVoice Directory, comrade.")
-        self.upload_state = 0
+        self.inner_state[update.message.from_user.id] = 0
         return ConversationHandler.END
 
     def get_clip_interval(self, update, context):
@@ -154,14 +163,14 @@ class Upload:
     
     def abort_upload(self, update, context):
         update.message.reply_text("Thanks for your contribution to the ZEDVoice Directory, comrade.")
-        self.upload_state = 0
+        self.inner_state[update.message.from_user.id] = 0
         return ConversationHandler.END
 
-    def cancel(self,update,context):
+    def cancel(self, update, context):
         user = update.message.from_user
         logger.info("user %s cancelled the upload operation",user.first_name)
         update.message.reply_text("Upload operation cancelled by user:(")
-        self.upload_state = 0
+        self.inner_state[update.message.from_user.id] = 0
         return ConversationHandler.END
 
     def get_members(self):
