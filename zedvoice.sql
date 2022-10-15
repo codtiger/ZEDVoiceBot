@@ -143,7 +143,7 @@ ALTER TABLE ONLY public.voices ALTER COLUMN owner_id SET DEFAULT nextval('public
 --
 
 COPY public.users (id, username, voice_style) FROM stdin;
-1	KavehAranian	aggressively obnoxious, with beautifully placed points and dick in butt jokes,holds the record for the most iconic number of voices in ZED.
+1	GodBless	aggressively obnoxious, with beautifully placed points and dick in butt jokes,holds the record for the most iconic number of voices in ZED.
 2	Farnood	the voice is often so nasal you wonder if you'll ever find the guy awake or in the mood to talk, talks a lot about his personal insecurities and self-aware identity crisis.
 3	AmirHP	the ultimate cringe king,curses a lot,big fan of GOT,Real Madrid,David Beckham,etc.Dynamics is his biggest fear,big fan of that one-seated conservative Arzeshi woman,Babooshka-esque laugs(can't even describe,gotta listen)
 4	Ahmad220	former member of Alcapoon,Javelin nose with great CS:GO skills,strangely loves one of his photos in which his head is poorly squeezed,started the \\"moody movie character profile picture with/without a quote\\" movement
